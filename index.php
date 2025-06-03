@@ -1,8 +1,21 @@
 <?php
+session_start();
 require_once 'config/database.php';
 
-// Get all products
-$stmt = $pdo->query("SELECT * FROM products ORDER BY created_at DESC");
+// Placeholder for generateCSRFToken function if not defined elsewhere
+if (!function_exists('generateCSRFToken')) {
+    function generateCSRFToken() {
+        // This is a placeholder. A proper CSRF token implementation is needed.
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
+        return $_SESSION['csrf_token'];
+    }
+}
+
+// Get all products with prepared statement
+$stmt = $pdo->prepare("SELECT * FROM products ORDER BY created_at DESC");
+$stmt->execute();
 $products = $stmt->fetchAll();
 ?>
 
@@ -38,32 +51,56 @@ $products = $stmt->fetchAll();
 
 <body class="index-page">
 
-  <header id="header" class="header sticky-top">
-    <div class="branding d-flex align-items-cente">
+  <header id="header" class="header fixed-top">
+    <div class="container d-flex align-items-center justify-content-between">
+      <a href="index.php" class="logo d-flex align-items-center">
+        <h1 class="sitename">SportHub</h1>
+      </a>
 
-      <div class="container position-relative d-flex align-items-center justify-content-between">
-        <a href="index.html" class="logo d-flex align-items-center">
-          <!-- Uncomment the line below if you also wish to use an image logo -->
-          <!-- <img src="assets/img/logo.png" alt=""> -->
-          <h1 class="sitename">SportHub</h1>
-        </a>
-
-        <nav id="navmenu" class="navmenu">
-          <ul>
-            <li><a href="#hero" class="active">Home</a></li>
-            <li><a href="#about">About</a></li>
-            <li><a href="#testimonials">Event</a></li>
-            <li><a href="#lapangan">Lapangan</a></li>
-            <li><a href="#komunitas">Komunitas</a></li>
-            <li><a href="#marketplace">Marketplace</a></li>
-            <li><a href="#artikel">Artikel</a></li>
-          </ul>
-          <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
-        </nav>
-      </div>
-
+      <nav id="navmenu" class="navmenu">
+        <ul>
+          <li><a href="#hero" class="active">Home</a></li>
+          <li><a href="#about">About</a></li>
+          <li><a href="#testimonials">Event</a></li>
+          <li><a href="#lapangan">Lapangan</a></li>
+          <li><a href="#komunitas">Komunitas</a></li>
+          <li><a href="#marketplace">Marketplace</a></li>
+          <li><a href="#artikel">Artikel</a></li>
+          <li class="ms-3">
+            <a href="cart.php" class="d-flex align-items-center position-relative">
+              <i class="bi bi-cart"></i>
+              <?php if (isset($_SESSION['cart']) && count($_SESSION['cart']) > 0): ?>
+                <span class="badge bg-primary ms-1 position-absolute" style="top: -8px; right: -8px;"><?php echo count($_SESSION['cart']); ?></span>
+              <?php endif; ?>
+            </a>
+          </li>
+          <?php if (isset($_SESSION['user_id']) && !empty($_SESSION['username'])): ?>
+            <li class="ms-3 dropdown">
+              <a href="#" class="btn btn-link dropdown-toggle d-flex align-items-center text-decoration-none p-0" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-person-circle me-2"></i>
+                <span class="d-none d-md-inline"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                <li>
+                  <a class="dropdown-item d-flex align-items-center text-danger" href="logout.php">
+                    <i class="bi bi-box-arrow-right me-2"></i>
+                    <span>Logout</span>
+                  </a>
+                </li>
+              </ul>
+            </li>
+          <?php else: ?>
+            <li class="ms-3">
+              <a href="login.php" class="d-flex align-items-center">
+                <i class="bi bi-person-circle me-2"></i>
+                <span class="d-none d-md-inline">Login</span>
+              </a>
+            </li>
+          <?php endif; ?>
+        </ul>
+        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+      </nav>
     </div>
-
   </header>
 
   <main class="main">
@@ -141,12 +178,45 @@ $products = $stmt->fetchAll();
                             <span class="stock">Stok: <?php echo $product['stock']; ?></span>
                             <span class="location">Jakarta</span>
                         </div>
-                        <form action="cart.php" method="POST" class="mt-2">
-                            <input type="hidden" name="action" value="add">
-                            <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
-                            <input type="hidden" name="quantity" value="1">
-                            <button type="submit" class="btn btn-primary w-100">Add to Cart</button>
-                        </form>
+                        <?php if (isset($_SESSION['user_id'])): ?>
+                            <div class="d-flex gap-2">
+                                <?php if ($product['stock'] > 0): ?>
+                                    <form action="cart.php" method="POST" class="flex-grow-1">
+                                        <input type="hidden" name="action" value="add">
+                                        <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
+                                        <input type="hidden" name="quantity" value="1">
+                                        <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
+                                        <button type="submit" class="btn btn-outline-primary w-100">
+                                            <i class="bi bi-cart-plus me-1"></i>Add to Cart
+                                        </button>
+                                    </form>
+                                    
+                                    <?php if (isset($_SESSION['cart']) && is_array($_SESSION['cart']) && count($_SESSION['cart']) > 0): ?>
+                                        <a href="cart.php" class="btn btn-primary flex-grow-1">
+                                            <i class="bi bi-cart me-1"></i>View Cart
+                                        </a>
+                                    <?php else: ?>
+                                        <a href="checkout.php?product_id=<?php echo $product['id']; ?>&quantity=1&csrf_token=<?php echo generateCSRFToken(); ?>" class="btn btn-primary flex-grow-1">
+                                            <i class="bi bi-credit-card me-1"></i>Checkout
+                                        </a>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <button class="btn btn-secondary w-100" disabled>
+                                        <i class="bi bi-x-circle me-1"></i>Stok Habis
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        <?php else: ?>
+                            <?php if ($product['stock'] > 0): ?>
+                                <a href="login.php" class="btn btn-primary w-100">
+                                    <i class="bi bi-box-arrow-in-right me-1"></i>Login to Purchase
+                                </a>
+                            <?php else: ?>
+                                <button class="btn btn-secondary w-100" disabled>
+                                    <i class="bi bi-x-circle me-1"></i>Stok Habis
+                                </button>
+                            <?php endif; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -789,13 +859,15 @@ $products = $stmt->fetchAll();
               <span class="h4 text-primary" id="modalProductPrice"></span>
             </div>
             <div class="mb-3" id="modalProductDescription"></div>
-            <form action="cart.php" method="POST">
+            <form action="cart.php" method="POST" id="modalAddToCartForm">
               <input type="hidden" name="action" value="add">
               <input type="hidden" name="product_id" id="modalProductId" value="">
               <div class="input-group mb-3" style="max-width: 120px;">
                 <input type="number" name="quantity" value="1" min="1" class="form-control" id="modalProductQty">
               </div>
-              <button type="submit" class="btn btn-primary w-100">Add to Cart</button>
+              <button type="submit" class="btn btn-primary w-100" id="modalAddToCartBtn">
+                <i class="bi bi-cart-plus me-1"></i>Add to Cart
+              </button>
             </form>
           </div>
         </div>
@@ -813,6 +885,8 @@ $products = $stmt->fetchAll();
     var modalDesc = document.getElementById('modalProductDescription');
     var modalId = document.getElementById('modalProductId');
     var modalQty = document.getElementById('modalProductQty');
+    var modalAddToCartBtn = document.getElementById('modalAddToCartBtn');
+    var modalAddToCartForm = document.getElementById('modalAddToCartForm');
 
     previewTriggers.forEach(function(trigger) {
       trigger.addEventListener('click', function(e) {
@@ -820,9 +894,10 @@ $products = $stmt->fetchAll();
         var name = this.getAttribute('data-name');
         var price = this.getAttribute('data-price');
         var image = this.getAttribute('data-image');
-        var stock = this.getAttribute('data-stock');
+        var stock = parseInt(this.getAttribute('data-stock'));
         var desc = this.getAttribute('data-description');
         var id = this.getAttribute('data-id');
+
         modalLabel.textContent = name;
         modalImage.src = image;
         modalPrice.textContent = 'Rp ' + price;
@@ -830,8 +905,57 @@ $products = $stmt->fetchAll();
         modalDesc.textContent = desc || '-';
         modalId.value = id;
         modalQty.value = 1;
+        modalQty.max = stock;
+
+        // Update tampilan berdasarkan stok
+        if (stock <= 0) {
+          modalStock.className = 'badge bg-danger';
+          modalStock.textContent = 'Stok Habis';
+          modalQty.disabled = true;
+          modalAddToCartBtn.disabled = true;
+          modalAddToCartBtn.innerHTML = '<i class="bi bi-x-circle me-1"></i>Stok Habis';
+          modalAddToCartBtn.className = 'btn btn-secondary w-100';
+        } else {
+          modalStock.className = 'badge bg-primary';
+          modalQty.disabled = false;
+          modalAddToCartBtn.disabled = false;
+          modalAddToCartBtn.innerHTML = '<i class="bi bi-cart-plus me-1"></i>Add to Cart';
+          modalAddToCartBtn.className = 'btn btn-primary w-100';
+        }
       });
     });
+
+    // Validasi quantity saat input
+    modalQty.addEventListener('input', function() {
+      var max = parseInt(this.max);
+      var value = parseInt(this.value);
+      
+      if (value > max) {
+        this.value = max;
+      } else if (value < 1) {
+        this.value = 1;
+      }
+    });
+
+    // Validasi form sebelum submit
+    modalAddToCartForm.addEventListener('submit', function(e) {
+      var stock = parseInt(modalQty.max);
+      var quantity = parseInt(modalQty.value);
+      
+      if (stock <= 0) {
+        e.preventDefault();
+        alert('Maaf, stok produk ini sudah habis.');
+      } else if (quantity > stock) {
+        e.preventDefault();
+        alert('Maaf, jumlah yang diminta melebihi stok yang tersedia.');
+      }
+    });
+
+    // Explicitly initialize Bootstrap Dropdown
+    var userDropdownElement = document.getElementById('userDropdown');
+    if (userDropdownElement) {
+      var userDropdown = new bootstrap.Dropdown(userDropdownElement);
+    }
   });
   </script>
 
@@ -1065,5 +1189,17 @@ $products = $stmt->fetchAll();
     .product-meta {
         font-size: 12px;
     }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+  }
 }
 </style>

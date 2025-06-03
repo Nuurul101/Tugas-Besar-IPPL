@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="text-center">
     <main class="form-signin">
         <form method="POST" action="">
-            <img class="mb-4" src="../assets/images/logo.png" alt="Logo" width="72" height="72">
+            <img class="mb-4" src="../assets/img/erasebg.png" alt="Logo" width="160" height="160">
             <h1 class="h3 mb-3 fw-normal">Admin Login</h1>
 
             <?php if ($error): ?>

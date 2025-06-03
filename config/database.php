@@ -1,6 +1,6 @@
 <?php
 $host = 'localhost';
-$dbname = 'banyumasporthub';
+$dbname = 'sporthub';
 $username = 'root';
 $password = '';
 

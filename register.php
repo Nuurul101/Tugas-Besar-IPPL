@@ -2,66 +2,70 @@
 session_start();
 require_once 'config/database.php';
 
-// Check if user is already logged in
+// If user is already logged in, redirect to home
 if (isset($_SESSION['user_id'])) {
-    if (isset($_GET['redirect'])) {
-        header('Location: ' . $_GET['redirect']);
-    } else {
-        header('Location: index.php');
-    }
+    header('Location: index.php');
     exit();
 }
 
-$error = '';
-$success = '';
+$errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = trim($_POST['name']);
-    $email = trim($_POST['email']);
-    $password = $_POST['password'];
-    $confirm_password = $_POST['confirm_password'];
-    
+    $username = trim($_POST['username'] ?? '');
+    $full_name = trim($_POST['full_name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    $phone = trim($_POST['phone'] ?? '');
+    $address = trim($_POST['address'] ?? '');
+
     // Validate input
-    if (empty($name) || empty($email) || empty($password) || empty($confirm_password)) {
-        $error = 'Please fill in all fields';
-    } elseif ($password !== $confirm_password) {
-        $error = 'Passwords do not match';
+    if (empty($username)) {
+        $errors[] = 'Username is required';
+    }
+    if (empty($full_name)) {
+        $errors[] = 'Full name is required';
+    }
+    if (empty($email)) {
+        $errors[] = 'Email is required';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'Invalid email format';
+    }
+    if (empty($password)) {
+        $errors[] = 'Password is required';
     } elseif (strlen($password) < 6) {
-        $error = 'Password must be at least 6 characters long';
-    } else {
+        $errors[] = 'Password must be at least 6 characters long';
+    }
+    if ($password !== $confirm_password) {
+        $errors[] = 'Passwords do not match';
+    }
+
+    if (empty($errors)) {
         try {
-            // Check if email already exists
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-            $stmt->execute([$email]);
+            // Check if username or email already exists
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
+            $stmt->execute([$username, $email]);
             if ($stmt->fetch()) {
-                $error = 'Email already registered';
+                $errors[] = 'Username or email already registered';
             } else {
-                // Create new user
-                $stmt = $pdo->prepare("INSERT INTO users (name, email, password, created_at) VALUES (?, ?, ?, NOW())");
+                // Insert new user
+                $stmt = $pdo->prepare("INSERT INTO users (username, full_name, email, password, phone, address, role, created_at) VALUES (?, ?, ?, ?, ?, ?, 'user', NOW())");
                 $stmt->execute([
-                    $name,
+                    $username,
+                    $full_name,
                     $email,
-                    password_hash($password, PASSWORD_DEFAULT)
+                    password_hash($password, PASSWORD_DEFAULT),
+                    $phone,
+                    $address
                 ]);
-                
-                // Get the new user's ID
-                $user_id = $pdo->lastInsertId();
-                
-                // Set session variables
-                $_SESSION['user_id'] = $user_id;
-                $_SESSION['user_name'] = $name;
-                $_SESSION['user_email'] = $email;
-                
-                // Redirect to the specified page or index
-                if (isset($_GET['redirect'])) {
-                    header('Location: ' . $_GET['redirect']);
-                } else {
-                    header('Location: index.php');
-                }
+
+                // Redirect to login page with success message
+                $_SESSION['register_success'] = true;
+                header('Location: login.php');
                 exit();
             }
         } catch (PDOException $e) {
-            $error = 'An error occurred. Please try again.';
+            $errors[] = 'Database error: ' . $e->getMessage();
             error_log($e->getMessage());
         }
     }
@@ -82,8 +86,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background-color: #e6f0f8;
         }
         .register-container {
-            max-width: 400px;
-            margin: 100px auto;
+            max-width: 500px;
+            margin: 50px auto;
             padding: 20px;
             background: #fff;
             border-radius: 8px;
@@ -93,15 +97,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-align: center;
             margin-bottom: 30px;
         }
-        .register-header h1 {
-            font-size: 24px;
-            color: #1e3a8a;
-            margin-bottom: 10px;
-        }
-        .form-floating {
+        .register-header img {
+            height: 60px;
             margin-bottom: 15px;
         }
-        .btn-register {
+        .btn-primary {
             background: #1e3a8a;
             border-color: #1e3a8a;
             width: 100%;
@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 16px;
             font-weight: 500;
         }
-        .btn-register:hover {
+        .btn-primary:hover {
             background: #1e40af;
             border-color: #1e40af;
         }
@@ -117,57 +117,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-align: center;
             margin-top: 20px;
         }
-        .login-link a {
-            color: #1e3a8a;
-            text-decoration: none;
-        }
-        .login-link a:hover {
-            text-decoration: underline;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="register-container">
             <div class="register-header">
-                <h1>Create Account</h1>
-                <p class="text-muted">Join BanyumaSportHub today</p>
+                <img src="assets/images/logo.png" alt="BanyumaSportHub Logo">
+                <h2>Register</h2>
             </div>
-            
-            <?php if ($error): ?>
-                <div class="alert alert-danger"><?php echo $error; ?></div>
+
+            <?php if (!empty($errors)): ?>
+                <div class="alert alert-danger">
+                    <ul class="mb-0">
+                        <?php foreach ($errors as $error): ?>
+                            <li><?php echo htmlspecialchars($error); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
             <?php endif; ?>
-            
-            <?php if ($success): ?>
-                <div class="alert alert-success"><?php echo $success; ?></div>
-            <?php endif; ?>
-            
+
             <form method="POST" action="">
-                <div class="form-floating mb-3">
-                    <input type="text" class="form-control" id="name" name="name" placeholder="Your Name" required>
-                    <label for="name">Full Name</label>
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" class="form-control" id="username" name="username" value="<?php echo htmlspecialchars($_POST['username'] ?? ''); ?>" required>
                 </div>
-                
-                <div class="form-floating mb-3">
-                    <input type="email" class="form-control" id="email" name="email" placeholder="name@example.com" required>
-                    <label for="email">Email address</label>
+                <div class="mb-3">
+                    <label for="full_name" class="form-label">Full Name</label>
+                    <input type="text" class="form-control" id="full_name" name="full_name" value="<?php echo htmlspecialchars($_POST['full_name'] ?? ''); ?>" required>
                 </div>
-                
-                <div class="form-floating mb-3">
-                    <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
-                    <label for="password">Password</label>
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>" required>
                 </div>
-                
-                <div class="form-floating mb-3">
-                    <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Confirm Password" required>
-                    <label for="confirm_password">Confirm Password</label>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password" name="password" required>
                 </div>
-                
-                <button type="submit" class="btn btn-register text-white">Register</button>
+                <div class="mb-3">
+                    <label for="confirm_password" class="form-label">Confirm Password</label>
+                    <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                </div>
+                <div class="mb-3">
+                    <label for="phone" class="form-label">Phone Number</label>
+                    <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($_POST['phone'] ?? ''); ?>">
+                </div>
+                <div class="mb-3">
+                    <label for="address" class="form-label">Address</label>
+                    <textarea class="form-control" id="address" name="address" rows="3"><?php echo htmlspecialchars($_POST['address'] ?? ''); ?></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Register</button>
             </form>
-            
+
             <div class="login-link">
-                <p>Already have an account? <a href="login.php<?php echo isset($_GET['redirect']) ? '?redirect=' . urlencode($_GET['redirect']) : ''; ?>">Login here</a></p>
+                <p>Already have an account? <a href="login.php">Login here</a></p>
             </div>
         </div>
     </div>

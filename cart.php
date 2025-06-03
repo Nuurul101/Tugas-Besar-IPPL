@@ -3,103 +3,72 @@ session_start();
 require_once 'config/database.php';
 
 // Initialize cart if not exists
-if (!isset($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
-    $_SESSION['cart'] = [];
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = array();
 }
 
 // Handle cart actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    error_log('POST data received: ' . print_r($_POST, true));
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'add':
-                if (isset($_POST['product_id'])) {
-                    try {
-                        $product_id = (int)$_POST['product_id'];
-                        $quantity = isset($_POST['quantity']) ? (int)$_POST['quantity'] : 1;
-                        
-                        error_log("Adding product ID: $product_id, Quantity: $quantity");
-                        
-                        // Get product details
-                        $stmt = $pdo->prepare("SELECT id, name, price, image_url, stock FROM products WHERE id = ?");
-                        $stmt->execute([$product_id]);
-                        $product = $stmt->fetch(PDO::FETCH_ASSOC);
-                        
-                        error_log('Product details: ' . print_r($product, true));
-                        
-                        if (!$product) {
-                            throw new Exception('Product not found');
-                        }
-                        
-                        // Add to cart
+                if (isset($_POST['product_id']) && isset($_POST['quantity'])) {
+                    $product_id = $_POST['product_id'];
+                    $quantity = (int)$_POST['quantity'];
+                    
+                    // Get product details
+                    $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ?");
+                    $stmt->execute([$product_id]);
+                    $product = $stmt->fetch();
+                    
+                    if ($product) {
+                        // Check if product already in cart
                         if (isset($_SESSION['cart'][$product_id])) {
                             $_SESSION['cart'][$product_id]['quantity'] += $quantity;
                         } else {
-                            $_SESSION['cart'][$product_id] = [
+                            $_SESSION['cart'][$product_id] = array(
                                 'id' => $product['id'],
                                 'name' => $product['name'],
                                 'price' => $product['price'],
                                 'quantity' => $quantity,
-                                'image_url' => $product['image_url'],
-                                'stock' => $product['stock']
-                            ];
+                                'image_url' => $product['image_url']
+                            );
                         }
-                        
-                        error_log('Cart after adding: ' . print_r($_SESSION['cart'], true));
-                        
-                        // Redirect to checkout if user is logged in
-                        if (isset($_SESSION['user_id'])) {
-                            header('Location: checkout.php');
-                            exit();
-                        }
-                        
-                    } catch (Exception $e) {
-                        error_log('Error adding to cart: ' . $e->getMessage());
-                        $_SESSION['message'] = [
-                            'type' => 'error',
-                            'text' => $e->getMessage()
-                        ];
                     }
                 }
                 break;
                 
             case 'update':
                 if (isset($_POST['product_id']) && isset($_POST['quantity'])) {
-                    $product_id = (int)$_POST['product_id'];
+                    $product_id = $_POST['product_id'];
                     $quantity = (int)$_POST['quantity'];
                     
-                    if ($quantity < 1) {
-                        unset($_SESSION['cart'][$product_id]);
-                    } else {
+                    if ($quantity > 0) {
                         $_SESSION['cart'][$product_id]['quantity'] = $quantity;
+                    } else {
+                        unset($_SESSION['cart'][$product_id]);
                     }
                 }
                 break;
                 
-            case 'clear':
-                $_SESSION['cart'] = [];
+            case 'remove':
+                if (isset($_POST['product_id'])) {
+                    $product_id = $_POST['product_id'];
+                    unset($_SESSION['cart'][$product_id]);
+                }
                 break;
-        }
-    }
-} elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    if (isset($_GET['remove'])) {
-        $product_id = (int)$_GET['remove'];
-        if (isset($_SESSION['cart'][$product_id])) {
-            unset($_SESSION['cart'][$product_id]);
+                
+            case 'clear':
+                $_SESSION['cart'] = array();
+                break;
         }
     }
 }
 
 // Calculate total
 $total = 0;
-$item_count = 0;
-if (is_array($_SESSION['cart'])) {
-    foreach ($_SESSION['cart'] as $product_id => $item) {
-        if (is_array($item) && isset($item['price']) && isset($item['quantity'])) {
-            $total += (float)$item['price'] * (int)$item['quantity'];
-            $item_count += (int)$item['quantity'];
-        }
-    }
+foreach ($_SESSION['cart'] as $item) {
+    $total += $item['price'] * $item['quantity'];
 }
 
 // Get user info if logged in
@@ -309,7 +278,7 @@ error_log('Cart contents: ' . print_r($_SESSION['cart'], true));
                             <div class="cart-summary">
                                 <h5 class="card-title mb-4">Order Summary</h5>
                                 <div class="d-flex justify-content-between mb-3">
-                                    <span>Items (<?php echo $item_count; ?>)</span>
+                                    <span>Items (<?php echo count($_SESSION['cart']); ?>)</span>
                                     <span>Rp <?php echo number_format($total, 0, ',', '.'); ?></span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-3">

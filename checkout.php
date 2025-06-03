@@ -131,15 +131,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <h5>Shipping Information</h5>
                             <div class="mb-3">
                                 <label class="form-label">Name</label>
-                                <input type="text" class="form-control" value="<?php echo htmlspecialchars($user['name']); ?>" readonly>
+                                <input type="text" class="form-control" value="<?php echo htmlspecialchars($user['full_name']); ?>" readonly>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Email</label>
                                 <input type="email" class="form-control" value="<?php echo htmlspecialchars($user['email']); ?>" readonly>
                             </div>
                             <div class="mb-3">
+                                <label class="form-label">Phone</label>
+                                <input type="tel" class="form-control" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" readonly>
+                            </div>
+                            <div class="mb-3">
                                 <label class="form-label">Shipping Address</label>
-                                <textarea class="form-control" name="shipping_address" rows="3" required></textarea>
+                                <textarea class="form-control" name="shipping_address" rows="3" required><?php echo htmlspecialchars($user['address'] ?? ''); ?></textarea>
                             </div>
                         </div>
 
