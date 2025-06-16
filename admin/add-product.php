@@ -12,33 +12,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = $_POST['name'];
     $description = $_POST['description'];
     $price = $_POST['price'];
-    $stock = $_POST['stock'];
+    $stock = (int)$_POST['stock'];
     
-    // Handle image upload
-    $image_url = '';
-    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = '../assets/img/products/';
-        if (!file_exists($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
-        }
-        
-        $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-        $new_filename = uniqid() . '.' . $file_extension;
-        $upload_path = $upload_dir . $new_filename;
-        
-        if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
-            $image_url = 'assets/img/products/' . $new_filename;
-        }
-    }
-    
-    // Insert product into database
-    $stmt = $pdo->prepare("INSERT INTO products (name, description, price, stock, image_url) VALUES (?, ?, ?, ?, ?)");
-    if ($stmt->execute([$name, $description, $price, $stock, $image_url])) {
-        $_SESSION['success'] = "Product added successfully!";
-        header('Location: products.php');
-        exit();
+    // Validate stock to ensure it's not negative
+    if ($stock < 0) {
+        $error = "Stock cannot be negative.";
     } else {
-        $error = "Failed to add product. Please try again.";
+        // Handle image upload
+        $image_url = '';
+        if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+            $upload_dir = '../assets/img/products/';
+            if (!file_exists($upload_dir)) {
+                mkdir($upload_dir, 0777, true);
+            }
+            
+            $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+            $new_filename = uniqid() . '.' . $file_extension;
+            $upload_path = $upload_dir . $new_filename;
+            
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
+                $image_url = 'assets/img/products/' . $new_filename;
+            }
+        }
+        
+        // Insert product into database
+        $stmt = $pdo->prepare("INSERT INTO products (name, description, price, stock, image_url) VALUES (?, ?, ?, ?, ?)");
+        if ($stmt->execute([$name, $description, $price, $stock, $image_url])) {
+            $_SESSION['success'] = "Product added successfully!";
+            header('Location: products.php');
+            exit();
+        } else {
+            $error = "Failed to add product. Please try again.";
+        }
     }
 }
 ?>
@@ -89,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             
                             <div class="mb-3">
                                 <label for="stock" class="form-label">Stock</label>
-                                <input type="number" class="form-control" id="stock" name="stock" min="0" required>
+                                <input type="number" class="form-control" id="stock" name="stock" min="0" value="0" required>
                             </div>
                             
                             <div class="mb-3">

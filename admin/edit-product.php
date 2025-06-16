@@ -25,37 +25,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = $_POST['name'];
     $description = $_POST['description'];
     $price = $_POST['price'];
-    $stock = $_POST['stock'];
+    $stock = (int)$_POST['stock'];
     
-    // Handle image upload
-    $image_url = $product['image_url']; // Keep existing image by default
-    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = '../assets/img/products/';
-        if (!file_exists($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
-        }
-        
-        $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-        $new_filename = uniqid() . '.' . $file_extension;
-        $upload_path = $upload_dir . $new_filename;
-        
-        if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
-            // Delete old image if exists
-            if ($product['image_url'] && file_exists('../' . $product['image_url'])) {
-                unlink('../' . $product['image_url']);
-            }
-            $image_url = 'assets/img/products/' . $new_filename;
-        }
-    }
-    
-    // Update product in database
-    $stmt = $pdo->prepare("UPDATE products SET name = ?, description = ?, price = ?, stock = ?, image_url = ? WHERE id = ?");
-    if ($stmt->execute([$name, $description, $price, $stock, $image_url, $product_id])) {
-        $_SESSION['success'] = "Product updated successfully!";
-        header('Location: products.php');
-        exit();
+    // Validate stock to ensure it's not negative
+    if ($stock < 0) {
+        $error = "Stock cannot be negative.";
     } else {
-        $error = "Failed to update product. Please try again.";
+        // Handle image upload
+        $image_url = $product['image_url']; // Keep existing image by default
+        if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+            $upload_dir = '../assets/img/products/';
+            if (!file_exists($upload_dir)) {
+                mkdir($upload_dir, 0777, true);
+            }
+            
+            $file_extension = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
+            $new_filename = uniqid() . '.' . $file_extension;
+            $upload_path = $upload_dir . $new_filename;
+            
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
+                // Delete old image if exists
+                if ($product['image_url'] && file_exists('../' . $product['image_url'])) {
+                    unlink('../' . $product['image_url']);
+                }
+                $image_url = 'assets/img/products/' . $new_filename;
+            }
+        }
+        
+        // Update product in database
+        $stmt = $pdo->prepare("UPDATE products SET name = ?, description = ?, price = ?, stock = ?, image_url = ? WHERE id = ?");
+        if ($stmt->execute([$name, $description, $price, $stock, $image_url, $product_id])) {
+            $_SESSION['success'] = "Product updated successfully!";
+            header('Location: products.php');
+            exit();
+        } else {
+            $error = "Failed to update product. Please try again.";
+        }
     }
 }
 ?>

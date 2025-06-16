@@ -11,8 +11,25 @@ if (!isset($_SESSION['admin_id'])) {
 // Handle product deletion
 if (isset($_POST['delete_product'])) {
     $product_id = $_POST['product_id'];
-    $stmt = $pdo->prepare("DELETE FROM products WHERE id = ?");
-    $stmt->execute([$product_id]);
+    
+    try {
+        $pdo->beginTransaction();
+
+        // First, delete related order items
+        $stmt_delete_order_items = $pdo->prepare("DELETE FROM order_items WHERE product_id = ?");
+        $stmt_delete_order_items->execute([$product_id]);
+
+        // Then, delete the product
+        $stmt_delete_product = $pdo->prepare("DELETE FROM products WHERE id = ?");
+        $stmt_delete_product->execute([$product_id]);
+
+        $pdo->commit();
+        $_SESSION['success'] = "Product and related order items deleted successfully!";
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        $_SESSION['error'] = "Error deleting product: " . $e->getMessage();
+    }
+
     header('Location: products.php');
     exit();
 }
@@ -31,6 +48,28 @@ $products = $stmt->fetchAll();
     <link href="../assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
     <link href="../assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
     <link href="../assets/css/main.css" rel="stylesheet">
+    <style>
+        .product-image {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .product-image:hover {
+            transform: scale(1.05);
+        }
+        .image-preview-modal .modal-dialog {
+            max-width: 800px;
+        }
+        .image-preview-modal .modal-body {
+            padding: 0;
+        }
+        .image-preview-modal img {
+            width: 100%;
+            height: auto;
+        }
+    </style>
 </head>
 <body>
     <?php include 'includes/header.php'; ?>
@@ -57,13 +96,22 @@ $products = $stmt->fetchAll();
                     </div>
                 <?php endif; ?>
 
+                <?php if (isset($_SESSION['error'])): ?>
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <?php 
+                        echo $_SESSION['error'];
+                        unset($_SESSION['error']);
+                        ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <?php endif; ?>
+
                 <div class="card">
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-striped table-hover">
                                 <thead>
                                     <tr>
-                                        <th>ID</th>
                                         <th>Image</th>
                                         <th>Name</th>
                                         <th>Price</th>
@@ -75,12 +123,14 @@ $products = $stmt->fetchAll();
                                 <tbody>
                                     <?php foreach ($products as $product): ?>
                                         <tr>
-                                            <td><?php echo $product['id']; ?></td>
                                             <td>
-                                                <img src="<?php echo htmlspecialchars($product['image_url']); ?>" 
+                                                <img src="../<?php echo htmlspecialchars($product['image_url']); ?>" 
                                                      alt="<?php echo htmlspecialchars($product['name']); ?>"
-                                                     class="img-thumbnail"
-                                                     style="max-width: 100px;">
+                                                     class="product-image"
+                                                     data-bs-toggle="modal"
+                                                     data-bs-target="#imagePreviewModal"
+                                                     data-image="../<?php echo htmlspecialchars($product['image_url']); ?>"
+                                                     data-name="<?php echo htmlspecialchars($product['name']); ?>">
                                             </td>
                                             <td><?php echo htmlspecialchars($product['name']); ?></td>
                                             <td>Rp <?php echo number_format($product['price'], 0, ',', '.'); ?></td>
@@ -92,7 +142,7 @@ $products = $stmt->fetchAll();
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
                                                 <form action="" method="POST" class="d-inline" 
-                                                      onsubmit="return confirm('Are you sure you want to delete this product?');">
+                                                      onsubmit="return confirm('Are you sure you want to delete this product? All associated order history for this product will also be deleted.');">
                                                     <input type="hidden" name="product_id" value="<?php echo $product['id']; ?>">
                                                     <button type="submit" name="delete_product" class="btn btn-sm btn-danger">
                                                         <i class="bi bi-trash"></i>
@@ -110,6 +160,41 @@ $products = $stmt->fetchAll();
         </div>
     </div>
 
+    <!-- Image Preview Modal -->
+    <div class="modal fade image-preview-modal" id="imagePreviewModal" tabindex="-1" aria-labelledby="imagePreviewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imagePreviewModalLabel"></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <img src="" alt="" id="previewImage">
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Initialize image preview modal
+        document.addEventListener('DOMContentLoaded', function() {
+            const imagePreviewModal = document.getElementById('imagePreviewModal');
+            const modalTitle = imagePreviewModal.querySelector('.modal-title');
+            const previewImage = imagePreviewModal.querySelector('#previewImage');
+            
+            // Add click event to all product images
+            document.querySelectorAll('.product-image').forEach(img => {
+                img.addEventListener('click', function() {
+                    const imageUrl = this.getAttribute('data-image');
+                    const productName = this.getAttribute('data-name');
+                    
+                    modalTitle.textContent = productName;
+                    previewImage.src = imageUrl;
+                    previewImage.alt = productName;
+                });
+            });
+        });
+    </script>
 </body>
 </html> 

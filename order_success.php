@@ -114,9 +114,7 @@ $items = $stmt->fetchAll();
                 <a href="index.php" class="btn btn-primary me-2">
                     <i class="bi bi-house-door"></i> Back to Home
                 </a>
-                <a href="orders.php" class="btn btn-outline-primary">
-                    <i class="bi bi-list-ul"></i> View All Orders
-                </a>
+                
             </div>
         </div>
     </div>
