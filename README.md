@@ -271,7 +271,7 @@ CREATE TABLE order_items (
 - **Project Manager**: [Kharisma Nurhayati, Laura Anisa MR, Nuurul Azizah]
 - **Lead Developer**: [Nuurul Azizah]
 - **UI/UX Designer**: [Laura Anisa MR]
-- **Database Administrator**: [Laura Anisa MR]
+- **Database Administrator**: [Kharisma Nurhayati]
 - **Security Specialist**: [Kharisma Nurhayati, Laura Anisa MR, Nuurul Azizah]
 
 ### Kontributor
